@@ -682,7 +682,7 @@ const CheckinPage = () => {
     if (week === 1) nextSundayBonus = "0.001 zkLTC";
     else if (week === 2) nextSundayBonus = "0.05 zkLTC";
     else if (week === 3) nextSundayBonus = "0.01 zkLTC";
-    else if (week === 4) nextSundayBonus = "0.1 zkLTC";
+    else if (week === 4) nextSundayBonus = "0.01 zkLTC";
   }
 
   // Calendar logic
@@ -3582,7 +3582,7 @@ const WeeklyLeaderboard = ({ className = '' }: { className?: string }) => {
         <div>Rank 1: 1 zkLTC + 2,000 pts</div>
         <div>Rank 2: 0.5 zkLTC + 1,000 pts</div>
         <div>Rank 3: 0.3 zkLTC + 500 pts</div>
-        <div>Rank 4-10: 0.1 zkLTC + 200 pts</div>
+        <div>Rank 4-10: 0.01 zkLTC + 200 pts</div>
         <div>Rank 11-20: 0.001 zkLTC + 100 pts</div>
         <div className="pt-2 opacity-70">Top 20 rewarded every Sunday midnight IST</div>
       </div>
@@ -3883,7 +3883,7 @@ const MathSlashPage = ({ onBack }: { onBack: () => void }) => {
               <div>Rank 1: 1 zkLTC + 2,000 pts</div>
               <div>Rank 2: 0.5 zkLTC + 1,000 pts</div>
               <div>Rank 3: 0.3 zkLTC + 500 pts</div>
-              <div>Rank 4-10: 0.1 zkLTC + 200 pts</div>
+              <div>Rank 4-10: 0.01 zkLTC + 200 pts</div>
               <div>Rank 11-20: 0.001 zkLTC + 100 pts</div>
               <div className="pt-2 opacity-70">Top 20 rewarded every Sunday midnight IST</div>
             </div>
@@ -4478,7 +4478,7 @@ const FaucetPage = () => {
         </button>
 
         <div className="mt-6 text-[10px] text-brand-text-muted space-y-1">
-          <p>• 0.1 zkLTC + 100 Points per claim</p>
+          <p>• 0.01 zkLTC + 100 Points per claim</p>
           <p>• 24 hour cooldown between claims</p>
         </div>
       </Card>
@@ -4561,7 +4561,7 @@ const FaucetModal = ({ open, onClose, wallet }: { open: boolean; onClose: () => 
       const res = await faucetApi.claim(wallet);
       if (res.ok) {
         setSuccess({ explorerUrl: res.explorerUrl });
-        try { addNotif(wallet, { type: "faucet", title: "Faucet Claimed", message: "0.1 zkLTC + 100 Points sent" }); } catch {}
+        try { addNotif(wallet, { type: "faucet", title: "Faucet Claimed", message: "0.01 zkLTC + 100 Points sent" }); } catch {}
       } else {
         setErrorMsg(res.message || res.reason || "Claim failed");
         try {
@@ -4595,7 +4595,7 @@ const FaucetModal = ({ open, onClose, wallet }: { open: boolean; onClose: () => 
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
               <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8 text-white" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
             </div>
-            <p className="text-lg font-bold mb-1">✅ 0.1 zkLTC + 100 Points sent!</p>
+            <p className="text-lg font-bold mb-1">✅ 0.01 zkLTC + 100 Points sent!</p>
             <p className="text-sm text-brand-text-muted mb-4">Check your wallet & points balance</p>
             {success.explorerUrl && (
               <a
@@ -4614,13 +4614,13 @@ const FaucetModal = ({ open, onClose, wallet }: { open: boolean; onClose: () => 
         ) : canClaim ? (
           <>
             <p className="text-brand-text-muted text-sm mb-2">Claim free testnet tokens to get started</p>
-            <p className="text-xs text-brand-text-muted/70 mb-6">Get 0.1 zkLTC + 100 Points • 24hr cooldown</p>
+            <p className="text-xs text-brand-text-muted/70 mb-6">Get 0.01 zkLTC + 100 Points • 24hr cooldown</p>
             <button
               onClick={handleClaim}
               disabled={claiming}
               className="w-full py-3.5 bg-white text-black rounded-xl font-bold text-base hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
             >
-              {claiming ? "Claiming..." : "Claim 0.1 zkLTC + 100 Points"}
+              {claiming ? "Claiming..." : "Claim 0.01 zkLTC + 100 Points"}
             </button>
             {errorMsg && (
               <div className="mt-3 px-3 py-2 rounded-lg bg-white/[0.02] border border-white/5 text-white/40 text-xs text-center font-bold uppercase tracking-widest">

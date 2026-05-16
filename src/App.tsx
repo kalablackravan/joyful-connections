@@ -3328,211 +3328,6 @@ const QuestsPage = () => {
 };
 
 // --- Page: Games ---
-const MATHSLASH_API = "https://game.test-hub.xyz";
-
-const RATE_BY_TIER: Record<string, number> = {
-  common: 0.0000769,
-  rare: 0.0000923,
-  epic: 0.0000999,
-};
-
-const TIER_NAMES: Record<number, string> = { 0: 'NONE', 1: 'COMMON', 2: 'RARE', 3: 'EPIC' };
-const tierKeyFromAny = (t: any): string => {
-  if (typeof t === 'number') return (TIER_NAMES[t] || 'NONE').toLowerCase();
-  return String(t ?? 'common').toLowerCase();
-};
-
-const ConvertPopup = ({ open, onClose, address, tier, points, onConverted, initialCooldown = 0, apiRate }: any) => {
-  const [val, setVal] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState<{ pts: number; zkltc: string; txHash?: string; explorerUrl?: string } | null>(null);
-  const [errMsg, setErrMsg] = useState<string>("");
-  const [cooldown, setCooldown] = useState<number>(0);
-  const [liveRate, setLiveRate] = useState<number | null>(null);
-  const [liveTier, setLiveTier] = useState<string | null>(null);
-  const [liveMax, setLiveMax] = useState<number | null>(null);
-
-  // Fully reset state on every open and refetch fresh stats + rate.
-  useEffect(() => {
-    if (!open) return;
-    setVal("");
-    setSuccess(null);
-    setErrMsg("");
-    setLiveRate(null);
-    setLiveTier(null);
-    setLiveMax(null);
-    setCooldown(Math.max(0, Math.floor(initialCooldown || 0)));
-    if (!address) return;
-    let alive = true;
-    (async () => {
-      try {
-        const r = await fetch(`${MATHSLASH_API}/convert/stats/${address}`);
-        if (r.ok) {
-          const d = await r.json();
-          const rt = Number(d?.rate ?? d?.user?.rate);
-          const tr = d?.tier ?? d?.user?.tier;
-          if (alive) {
-            if (Number.isFinite(rt)) setLiveRate(rt);
-            if (tr !== undefined && tr !== null) setLiveTier(String(tr));
-          }
-        }
-      } catch { /* ignore */ }
-      try {
-        const r2 = await fetch(`${MATHSLASH_API}/game/mathslash/stats/${address}`);
-        if (r2.ok) {
-          const s = await r2.json();
-          const mx = Number(s?.totalPointsEarned);
-          if (alive && Number.isFinite(mx)) setLiveMax(Math.max(0, Math.floor(mx)));
-        }
-      } catch { /* ignore */ }
-    })();
-    return () => { alive = false; };
-  }, [open, initialCooldown, address]);
-
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    const t = setInterval(() => setCooldown(c => Math.max(0, c - 1)), 1000);
-    return () => clearInterval(t);
-  }, [cooldown]);
-
-  const tierKey = (liveTier ?? (typeof tier === 'string' ? tier : tierKeyFromAny(tier))).toString().toLowerCase();
-  const propRate = Number(apiRate);
-  const rate = Number.isFinite(liveRate as number) && (liveRate as number) > 0
-    ? (liveRate as number)
-    : (Number.isFinite(propRate) && propRate > 0 ? propRate : 0);
-  const available = liveMax !== null ? liveMax : Math.max(0, Math.floor(Number(points ?? 0)));
-  const MAX_POINTS = Math.max(0, available);
-  const n = Math.min(parseInt(val) || 0, MAX_POINTS);
-  const preview = (n * rate).toFixed(7);
-
-  const fmtCooldown = (s: number) => {
-    const h = String(Math.floor(s / 3600)).padStart(2, '0');
-    const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
-    const sec = String(s % 60).padStart(2, '0');
-    return `${h}:${m}:${sec}`;
-  };
-
-  const handleConvert = async () => {
-    if (!address || n < 1 || n > MAX_POINTS) return;
-    setSubmitting(true);
-    setErrMsg("");
-    try {
-      const res = await fetch(`${MATHSLASH_API}/convert/convert`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: address, points: n }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.cooldown) {
-        const cd = Number(data?.nextConvertIn ?? data?.cooldownRemaining ?? 0);
-        if (cd > 0) setCooldown(Math.floor(cd));
-        setErrMsg(data?.error || data?.message || (data?.cooldown ? 'Cooldown active' : `Error ${res.status}`));
-      } else {
-        const txHash = data?.txHash || data?.hash || data?.transactionHash || data?.tx;
-        const explorerUrl = data?.explorerUrl || (txHash ? `https://liteforge.explorer.caldera.xyz/tx/${txHash}` : undefined);
-        const zkltc = data?.zkltcSent ?? data?.zkltcReceived ?? data?.zkltc ?? preview;
-        const pts = Number(data?.pointsUsed ?? n);
-        try {
-          if (address) localStorage.setItem(`mathslash_today_${address.toLowerCase()}`, JSON.stringify({ ts: Date.now(), zkltc: String(zkltc) }));
-        } catch { /* ignore */ }
-        onConverted?.({ pts, zkltc: String(zkltc), txHash, explorerUrl });
-        setSuccess({ pts, zkltc: String(zkltc), txHash, explorerUrl });
-      }
-    } catch (e: any) {
-      setErrMsg(e?.message || 'Network error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (!open) return null;
-  const onCooldown = cooldown > 0;
-  const btnDisabled = submitting || n < 1 || n > MAX_POINTS || onCooldown || MAX_POINTS < 1;
-
-  return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.85)' }} onClick={onClose}>
-      <div className="convert-popup-card w-full max-w-md p-6 rounded-2xl relative" style={{ background: '#0a0a0a', border: '1px solid #1f1f1f' }} onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-3 right-3 text-[#555] hover:text-white"><X size={18} /></button>
-        <h3 className="font-mono text-white text-lg mb-1">Convert Points → zkLTC</h3>
-        <p className="font-mono text-[11px] text-[#555] mb-2 uppercase">Tier: {tierKey} · 1 PT = {rate > 0 ? rate.toFixed(7) : '—'} ZKLTC</p>
-        <p className="font-mono text-[11px] text-white mb-4">Available: {available} pts</p>
-        <input
-          type="number"
-          min={1}
-          max={MAX_POINTS}
-          step={1}
-          value={val}
-          onChange={(e) => {
-            const digits = e.target.value.replace(/[^0-9]/g, '');
-            if (digits === '') { setVal(''); return; }
-            const num = Math.min(parseInt(digits, 10) || 0, MAX_POINTS);
-            setVal(String(num));
-          }}
-          placeholder={`Enter points (1-${MAX_POINTS})`}
-          disabled={onCooldown || !!success}
-          className="w-full px-3 py-3 rounded-lg font-mono text-white bg-black border border-[#1f1f1f] outline-none focus:border-white/40 mb-2 disabled:opacity-50"
-        />
-        <div className="font-mono text-xs text-[#555] mb-4">{n} pts → {preview} zkLTC</div>
-        {onCooldown && !success && (
-          <div
-            className="font-mono text-[11px] mb-3"
-            style={{ background: '#0a0a0a', border: '1px solid #1f1f1f', borderRadius: 8, padding: 10, color: '#fff' }}
-          >
-            <div style={{ color: '#fff' }}>Cooldown active</div>
-            <div style={{ color: '#555' }}>Next convert in {fmtCooldown(cooldown)}</div>
-          </div>
-        )}
-        <button
-          onClick={handleConvert}
-          disabled={btnDisabled || !!success}
-          className="w-full py-3 rounded-lg font-mono font-bold text-sm"
-          style={
-            onCooldown
-              ? { background: '#0a0a0a', border: '1px solid #1f1f1f', color: '#333333', cursor: 'not-allowed' }
-              : (btnDisabled || !!success)
-              ? { background: '#ffffff', color: '#000000', opacity: 0.4, cursor: 'not-allowed' }
-              : { background: '#ffffff', color: '#000000' }
-          }
-        >
-          {submitting ? 'CONVERTING…' : onCooldown ? 'COOLDOWN' : 'CONVERT'}
-        </button>
-        {success && (
-          <div
-            className="mt-3 font-mono text-xs"
-            style={{ background: '#0a0a0a', border: '1px solid #1f1f1f', borderRadius: 12, padding: 12, color: '#fff' }}
-          >
-            <div className="mb-2">✅ Converted {success.pts} pts → {success.zkltc} zkLTC</div>
-            {success.explorerUrl && (
-              <a
-                href={success.explorerUrl}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  fontFamily: 'monospace',
-                  fontSize: '11px',
-                  color: '#ffffff',
-                  textDecoration: 'underline',
-                  wordBreak: 'break-all',
-                  display: 'inline-block',
-                }}
-              >
-                View Transaction →
-              </a>
-            )}
-          </div>
-        )}
-        {errMsg && !success && (
-          <div
-            className="mt-3 font-mono text-xs"
-            style={{ background: '#0a0a0a', border: '1px solid #1f1f1f', borderRadius: 8, padding: 8, color: '#555555' }}
-          >
-            {errMsg}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
 
 const MATHSLASH_API_URL = 'https://game.test-hub.xyz';
 const WeeklyLeaderboard = ({ className = '' }: { className?: string }) => {
@@ -3763,7 +3558,7 @@ const MathSlashPage = ({ onBack }: { onBack: () => void }) => {
             </tr>
           </thead>
           <tbody>
-            {board.slice(0, 10).map((e: any, i: number) => {
+            {board.slice(0, 20).map((e: any, i: number) => {
               const w = e.wallet || e.walletAddress || e.address || '';
               const cls = i === 0 ? 'text-brand-text-primary font-bold' : 'text-brand-text-muted';
               return (
@@ -3791,7 +3586,7 @@ const MathSlashPage = ({ onBack }: { onBack: () => void }) => {
           <div className="order-2 lg:order-1 p-5 rounded-2xl font-mono bg-brand-surface border border-brand-border">
             <div className="flex items-center justify-between mb-4">
               <div className="text-[11px] uppercase text-brand-text-muted">Your Stats</div>
-              <span className="text-[9px] uppercase px-2 py-0.5 rounded-full text-brand-bg bg-brand-text-primary">Free to Play</span>
+              <span className="text-[9px] uppercase px-2 py-0.5 rounded-full text-black bg-green-500 font-bold">Free to Play</span>
             </div>
             {!isConnected ? (
               <div className="text-brand-text-muted text-xs">Connect wallet to track your stats</div>
@@ -3880,21 +3675,17 @@ const MathSlashPage = ({ onBack }: { onBack: () => void }) => {
 
       {/* Global stats bottom bar */}
       {!playing && (
-        <div className="mt-6 p-5 rounded-2xl font-mono bg-brand-surface border border-brand-border grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="mt-6 p-5 rounded-2xl font-mono bg-brand-surface border border-brand-border grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <div className="text-[10px] uppercase text-brand-text-muted">Total Games</div>
             <div className="text-brand-text-primary text-lg font-bold">{Number(global?.totalGames ?? 0).toLocaleString()}</div>
           </div>
           <div>
-            <div className="text-[10px] uppercase text-brand-text-muted">Total Players</div>
+            <div className="text-[10px] uppercase text-brand-text-muted">Unique Players</div>
             <div className="text-brand-text-primary text-lg font-bold">{Number(global?.uniquePlayers ?? 0).toLocaleString()}</div>
           </div>
           <div>
-            <div className="text-[10px] uppercase text-brand-text-muted">Total Score</div>
-            <div className="text-brand-text-primary text-lg font-bold">{Number(global?.totalScore ?? 0).toLocaleString()}</div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase text-brand-text-muted">zkLTC Distributed</div>
+            <div className="text-[10px] uppercase text-brand-text-muted">Total zkLTC Distributed</div>
             <div className="text-brand-text-primary text-lg font-bold">{Number(global?.totalZkltc ?? 0).toFixed(6)}</div>
           </div>
         </div>
@@ -3935,55 +3726,6 @@ const MathSlashPage = ({ onBack }: { onBack: () => void }) => {
         </div>
       )}
     </motion.div>
-  );
-};
-
-const GlobalConvertStats = ({ reloadKey = 0 }: { reloadKey?: number }) => {
-  const [stats, setStats] = useState<{ totalTxns: number; totalPoints: number; totalZkltc: number } | null>(null);
-  useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const r = await fetch('https://game.test-hub.xyz/convert/stats/global');
-        const d = await r.json();
-        if (!alive) return;
-        const u = d?.global ?? d?.stats ?? d ?? {};
-        setStats({
-          totalTxns: Number(u.totalTxns ?? 0),
-          totalPoints: Number(u.totalPointsConverted ?? u.totalPoints ?? 0),
-          totalZkltc: Number(u.totalZkltcSent ?? u.totalZkltcDistributed ?? u.totalZkltc ?? u.totalZkltcReceived ?? 0),
-        });
-      } catch {}
-    };
-    load();
-    const id = setInterval(load, 30000);
-    return () => { alive = false; clearInterval(id); };
-  }, [reloadKey]);
-
-  const Row = ({ label, value }: { label: string; value: string }) => (
-    <div className="flex items-center justify-between py-2">
-      <div style={{ color: '#555555', fontSize: 10, letterSpacing: '0.1em' }} className="uppercase font-mono">{label}</div>
-      <div className="text-white font-bold font-mono" style={{ fontSize: 16 }}>{value}</div>
-    </div>
-  );
-
-  const fmt = (n: number, d = 0) => Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: d }) : '0';
-
-  return (
-    <div className="font-mono global-convert-stats" style={{ background: '#0a0a0a', border: '1px solid #1f1f1f', borderRadius: 12, padding: 16 }}>
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-[11px] uppercase text-white" style={{ letterSpacing: '0.1em' }}>Global Convert Stats</div>
-        <div className="flex items-center gap-1.5">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-          <span style={{ color: '#555555', fontSize: 10, letterSpacing: '0.1em' }} className="uppercase">Live</span>
-        </div>
-      </div>
-      <div className="divide-y" style={{ borderColor: '#1f1f1f' }}>
-        <Row label="Total Points Converted" value={`${fmt(stats?.totalPoints ?? 0)} PTS`} />
-        <Row label="Total zkLTC Distributed" value={`${fmt(stats?.totalZkltc ?? 0, 6)} zkLTC`} />
-        <Row label="Total Conversions" value={`${fmt(stats?.totalTxns ?? 0)} txns`} />
-      </div>
-    </div>
   );
 };
 
